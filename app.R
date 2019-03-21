@@ -1,10 +1,11 @@
 #
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
+# This is a Shiny app that solves the trapped knight problem, where a chess 
+# knight is placed at the origin of an integer spiral, and keeps making the 
+# legal move that places it closest to the center, until it eventually can no 
+# longer make a legal move.
 #
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
+# This app dynamically draws the path of such a knight, allowing the use to 
+# specify the initial conditions and the shape of the knight's move.
 #
 
 library(shiny)
@@ -12,8 +13,11 @@ library(dplyr)
 library(ggplot2)
 library(plotly)
 
+# Function that, given a set of x and y integer coordinates, returns the number
+# that represents the element in the integer spiral that lands on that space.
 spiral <- function(x, y){
   stopifnot(length(x) == length(y))
+  stopifnot(is.integer(x) & is.integer(y))
   sapply(1:length(x), function(i){
     x <- x[i]
     y <- y[i]
@@ -39,6 +43,8 @@ spiral <- function(x, y){
   })
 }
 
+# Given x and y coordinates, and a shape of a knights jump, return a dataframe 
+# of all spots that the knight can jump to
 jumps.knight <- function(x, y, jump = c(2,1)){
   jump_back <- c(jump[2], jump[1])
   spots <- unique(data.frame(x = c(jump, jump, -jump, -jump),
@@ -53,13 +59,15 @@ jumps.knight <- function(x, y, jump = c(2,1)){
   return(spots)
 }
 
-# Define UI for application that draws a histogram
+# Define UI for application that draws the knights tour.
 ui <- fluidPage(
    
-   # Application title
+   # No title
    titlePanel(""),
    
-   # Sidebar with a slider input for number of bins 
+   # Sidebar with inputs for the knight's starting location and the shape of its
+   # jump, as well as the maximum number of iterations before the simulation 
+   # should break (to avoid long server hang or an infinite loop.)
    sidebarLayout(
       sidebarPanel(
          numericInput("j1",
@@ -93,16 +101,17 @@ ui <- fluidPage(
          width = 3
       ),
       
-      # Show a plot of the generated distribution
+      # Show a plot of the generated knights tour
       mainPanel(
-        column(width = 10, plotOutput("distPlot", height = "auto"))
+        column(width = 10, plotOutput("Plot", height = "auto"))
       )
    )
 )
 
-# Define server logic required to draw a histogram
+# Define server logic required to draw the knights tour
 server <- function(input, output, session) {
-  
+    
+    # Get user inputs as reactives.
     j1 <- eventReactive(input$goButton, {
       input$j1
     })
@@ -112,7 +121,9 @@ server <- function(input, output, session) {
     nmax <- eventReactive(input$goButton, {
       as.numeric(input$n_max)
     })
+    # Initialize with the simplest case.
     visited <- data.frame(x=0,y=0,s=1,n=1)
+    # Get the plot of the base case ready.
     p <- visited %>% 
       ggplot() +  
       geom_path(aes(x, y, color = n)) + 
@@ -120,7 +131,9 @@ server <- function(input, output, session) {
       coord_fixed()+
       guides(color=FALSE)+
       theme_minimal()
+    # State of plot
     finished <- FALSE
+    # When the go button is pressed, rebuild the dataframe
     observeEvent(input$goButton, {
       visited <- data.frame(
         x = as.numeric(input$x0),
@@ -132,7 +145,8 @@ server <- function(input, output, session) {
       )
     })
    
-   output$distPlot <- renderPlot({
+   # Update the data and then render the plot using that data.
+   output$Plot <- renderPlot({
      update_data()
      jump <- as.numeric(c(j1(), j2()))
      N <- nrow(visited)
@@ -151,6 +165,7 @@ server <- function(input, output, session) {
      session$clientData$output_distPlot_width
    })
    
+   # Update the data, called within the plotting expression
    update_data <- function(){
      jump <- as.numeric(c(j1(), j2()))
      n_max <- nmax()
